@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dns-query-app
+  namespace: staging
+  labels:
+    app: dns-query-app
+spec:
+  replicas: 1  # Number of pod replicas
+  selector:
+    matchLabels:
+      app: dns-query-app
+  template:
+    metadata:
+      labels:
+        app: dns-query-app
+    spec:
+      containers:
+        - name: dns-query-app
+          image: k4mrul/dns-query-app:v3
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NODE_ENV
+              value: "production"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dns-query-app-service
+  namespace: staging
+spec:
+  selector:
+    app: dns-query-app
+  ports:
+    - protocol: TCP
+      port: 80  # External port on the service
+      targetPort: 3000  # Port the app is listening on inside the container
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dns-query-app-ingress
+  namespace: staging
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: dns-query.staging.dokandev.com
+    http:
+      paths:
+        - path: /query
+          pathType: Prefix
+          backend:
+            service:
+              name: dns-query-app-service
+              port:
+                number: 80
+  tls:
+  - hosts:
+    - '*.dokandev.com'
+    - '*.ondokan.com'
+    - '*.staging.dokandev.com'
+    secretName: dokandev-wildcard-certificate
